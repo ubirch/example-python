@@ -76,7 +76,7 @@ def abort():
 
 def wait(t, reason="Waiting..."):
     if add_stdout:
-        with Halo(" " + reason, spinner="dots"):
+        with Halo(reason, spinner="dots"):
             time.sleep(t)
         logger.info(ok + reason + " done!")
     else:
@@ -142,17 +142,17 @@ if not api.device_exists(device_uuid):
     })
 
     if d_create_resp.ok:
-        logger.info(ok + "Created device {}".format(stylize(device_uuid, colored.fg("green"))))
+        logger.info(ok + "Created device {}".format(stylize(device_name, colored.fg("green"))))
     else:
         logger.error(nok + "Failed to create the device {} ({} - {})"
-                     .format(stylize(device_uuid, colored.fg("blue")),
+                     .format(stylize(device_name, colored.fg("blue")),
                              stylize(d_create_resp.status_code, colored.fg("yellow")),
                              stylize(d_create_resp.content, colored.fg("red"))))
         abort()
     # give the system some time
     time.sleep(5)
 else:
-    logger.info(ok + "Device {} already exists".format(stylize(device_uuid, colored.fg("blue"))))
+    logger.info(ok + "Device {} already exists".format(stylize(device_name, colored.fg("blue"))))
 
 
 # endregion
@@ -188,7 +188,7 @@ else:
     abort()
 # endregion
 
-wait(5, "Waiting for the message to be processed...")
+wait(2, "Waiting for the message to be processed...")
 
 # region verify the message
 logger.info(step + "Validating the message with on-premise validator")
