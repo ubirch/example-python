@@ -22,6 +22,7 @@ from halo import Halo
 
 ok = stylize("✔️ ", colored.fg("green"))
 nok = stylize("❌ ", colored.fg("red"))
+step = stylize("▶ ", colored.fg("blue"))
 
 # region setting up logging
 logging.basicConfig(format='%(asctime)s %(name)20.20s %(levelname)-8.8s %(message)s',
@@ -75,7 +76,7 @@ def abort():
 
 def wait(t, reason="Waiting..."):
     if add_stdout:
-        with Halo(reason, spinner="dots"):
+        with Halo(" " + reason, spinner="dots"):
             time.sleep(t)
         logger.info(ok + reason + " done!")
     else:
@@ -93,6 +94,7 @@ atexit.register(protocol.persist, device_uuid)
 # endregion
 
 # region check the connection to ubirch api
+logger.info(step + "Checking authorization")
 # TODO: replace this with client api call when it's implemented
 user_req = requests.get("https://auth.{}.ubirch.com/api/authService/v1/userInfo".format(ub_env), headers=api._auth)
 if user_req.ok:
@@ -104,6 +106,7 @@ else:
 # endregion
 
 # region identity creation
+logger.info(step + "Creating the identity")
 identity_uuid = device_uuid
 if not keystore.exists_signing_key(identity_uuid):
     keystore.create_ed25519_keypair(identity_uuid)
@@ -119,10 +122,11 @@ if not keystore.exists_signing_key(identity_uuid):
                              stylize(registration_resp.content, colored.fg("red"))))
         abort()
 else:
-    logger.info(ok + "Identity {} already exists".format(stylize(identity_uuid, colored.fg("green"))))
+    logger.info(ok + "Identity {} already exists".format(stylize(identity_uuid, colored.fg("blue"))))
 # endregion
 
 # region device creation
+logger.info(step + "Creating the device")
 if not api.device_exists(device_uuid):
     d_create_resp = api.device_create({
         "deviceId": str(device_uuid),
@@ -148,13 +152,16 @@ if not api.device_exists(device_uuid):
     # give the system some time
     time.sleep(5)
 else:
-    logger.info(ok + "Device {} already exists".format(stylize(device_uuid, colored.fg("green"))))
+    logger.info(ok + "Device {} already exists".format(stylize(device_uuid, colored.fg("blue"))))
 
 
 # endregion
 
 
 # region sending messages
+logger.info(step + "Sending the message")
+
+
 def send_message(uuid: UUID, payload: bytes) -> (Response, bytes):
     message = protocol.message_chained(uuid, UBIRCH_PROTOCOL_TYPE_BIN, payload)
     sig = protocol._signatures[uuid]
@@ -184,7 +191,7 @@ else:
 wait(5, "Waiting for the message to be processed...")
 
 # region verify the message
-logger.info("Now, we'll validate the message with on-premise validator!")
+logger.info(step + "Validating the message with on-premise validator")
 response = requests.get(validator_address + "/" + quote(h_str, safe="+="))
 if response.ok:
     logger.info(ok + "Message {} successfully verified".format(stylize(h_str, colored.fg("green"))))
