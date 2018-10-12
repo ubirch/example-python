@@ -1,14 +1,14 @@
 import configparser
 import logging
 import sys
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from demo_logging import logger
 
-ini_name = "demo.ini" if len(sys.argv) < 2 else sys.argv[1]
+config_filename = "demo.ini" if len(sys.argv) < 2 else sys.argv[1]
 
 config = configparser.ConfigParser()
-config.read("demo.ini")
+config.read(config_filename)
 
 ub_auth = config["ubirch"]["auth"]
 ub_env = config["ubirch"]["env"]
@@ -35,7 +35,7 @@ device_hwid = UUID(get_from_config_or_default("device", "hwId", lambda: str(devi
 
 add_stdout = get_from_config_or_default("demo", "stdout", lambda: False, getboolean=True)
 
-with open("demo.ini", "w") as f:
+with open(config_filename, "w") as f:
     config.write(f)
 
 if add_stdout:
