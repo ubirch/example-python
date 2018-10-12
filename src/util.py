@@ -1,4 +1,7 @@
+import struct
 import time
+from datetime import datetime, timezone, timedelta
+from uuid import getnode
 
 import colored
 from colored import stylize
@@ -23,7 +26,7 @@ def wait(t, reason="Waiting..."):
             time.sleep(t)
         logger.info(ok + reason + " done!")
     else:
-        logger.info(reason)
+        logger.info(step + reason)
         time.sleep(t)
 
 
@@ -32,3 +35,11 @@ def shorten(text):
         return text[:22] + "..." + text[-25:]
     else:
         return text
+
+
+def make_sensitive_message():
+    now = datetime.now(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)  # use POSIX epoch
+    posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
+    posix_timestamp_millis = posix_timestamp_micros // 1000
+    return struct.pack("LLf", getnode(), posix_timestamp_millis, 900)

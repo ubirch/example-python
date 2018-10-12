@@ -1,13 +1,12 @@
 import hashlib
-import struct
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import logging
 import time
 from pprint import pformat
 from urllib.parse import quote
 import colored
 from colored import stylize
-from uuid import UUID, getnode
+from uuid import UUID
 import base64
 import msgpack
 import requests
@@ -18,8 +17,7 @@ from ubirch.ubirch_protocol import UBIRCH_PROTOCOL_TYPE_REG, UBIRCH_PROTOCOL_TYP
 from config import device_uuid, ub_env, ub_auth, device_type, device_name, device_hwid, validator_address
 from demo_logging import logger
 from ubirch_proto import Proto
-from util import ok, nok, step, abort, wait, shorten
-
+from util import ok, nok, step, abort, wait, shorten, make_sensitive_message
 
 # region setting up the keystore, api and the protocol
 keystore = ubirch.KeyStore(device_uuid.hex + ".jks", "demo-keystore")
@@ -90,49 +88,62 @@ else:
     logger.info(ok + "Device {} already exists".format(stylize(device_name, colored.fg("blue"))))
 # endregion
 
+# region sealing the payload
+logger.info(step + "Sealing a sensitive message")
 
-# region sending messages
-logger.info(step + "Sending the message")
 
-
-def send_message(uuid: UUID, payload: bytes) -> Response:
-    message = protocol.message_chained(uuid, UBIRCH_PROTOCOL_TYPE_BIN, payload)
+# we're sending only the hash of our message to ubirch!
+# this is useful, because we then can use ubirch to validate if our message has got to the other side unchanged
+def seal(uuid: UUID, payload: bytes) -> Response:
+    payload_hash = hashlib.sha512(payload).digest()
+    message = protocol.message_chained(uuid, UBIRCH_PROTOCOL_TYPE_BIN, payload_hash)
     return api.send(message)
 
 
-now = datetime.now(timezone.utc)
-epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)  # use POSIX epoch
-posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
-posix_timestamp_millis = posix_timestamp_micros // 1000
-msg = struct.pack("LLf", getnode(), posix_timestamp_millis, 900)
-h = hashlib.sha512(msg).digest()
-h_str = bytes.decode(base64.b64encode(h))
+msg = make_sensitive_message()
+msg_b64 = bytes.decode(base64.b64encode(msg))
 
-response = send_message(device_uuid, h)
+response = seal(device_uuid, msg)
 if response.ok:
-    logger.info(ok + "Successfully sent {}".format(stylize(h_str, colored.fg("green"))))
+    logger.info(ok + "Successfully sealed message {}".format(stylize(msg_b64, colored.fg("green"))))
     resp = msgpack.loads(response.content)
 else:
-    logger.error(nok + "Failed to send {} ({} - {})"
-                 .format(stylize(h_str, colored.fg("blue")),
+    logger.error(nok + "Failed to seal message {} ({} - {})"
+                 .format(stylize(msg_b64, colored.fg("blue")),
                          stylize(response.status_code, colored.fg("yellow")),
                          stylize(response.content, colored.fg("red"))))
     abort()
+
+wait(2, "Waiting for the seal to be processed...")
+
+logger.info(step + "Sending the message {} to our super-secret backend".format(stylize(msg_b64, colored.fg("blue"))))
+secret_backend = {}
+secret_backend["secret_message"] = msg
 # endregion
 
-wait(2, "Waiting for the message to be processed...")
+logger.info(stylize("... meanwhile in the super-secret backend ...", colored.fg("orange_1")))
 
 # region verify the message
-logger.info(step + "Validating the message with on-premise validator")
-response = requests.get(validator_address + "/" + quote(h_str, safe="+="))
+srvr = stylize("sec-srvr> ", colored.fg("yellow"))
+
+received_message = secret_backend["secret_message"]
+received_message_b64 = bytes.decode(base64.b64encode(received_message))
+logger.info(srvr + "Received a super-secret message {}".format(stylize(received_message_b64, colored.fg("blue"))))
+
+logger.info(srvr + step + "Validating the message with on-premise validator")
+received_message_hash = bytes.decode(base64.b64encode(hashlib.sha512(received_message).digest()))
+response = requests.get(validator_address + "/" + quote(received_message_hash, safe="+="))
+
 if response.ok:
-    logger.info(ok + "Message {} successfully verified".format(stylize(h_str, colored.fg("green"))))
+    logger.info(srvr + ok + "Message {} successfully verified"
+                .format(stylize(received_message_b64, colored.fg("green"))))
     json = response.json()
     shortened = {key: shorten(json[key]) for key in json}
-    logger.info(stylize(pformat(shortened), colored.fg("green")))
+    logger.info(srvr + "Relevant proof information (shortened):")
+    logger.info(srvr + stylize(shortened, colored.fg("blue")))
 else:
-    logger.error(nok + "Failed to verify the message {} ({} - {})"
-                 .format(stylize(h_str, colored.fg("blue")),
+    logger.error(srvr + nok + "Failed to verify the message {} ({} - {})"
+                 .format(stylize(received_message_b64, colored.fg("blue")),
                          stylize(response.status_code, colored.fg("red")),
                          stylize(response.content, colored.fg("red"))))
 
