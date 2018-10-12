@@ -1,8 +1,5 @@
-import atexit
-import configparser
 import hashlib
 import struct
-import sys
 from datetime import datetime, timezone, timedelta
 import logging
 import time
@@ -10,79 +7,18 @@ from pprint import pformat
 from urllib.parse import quote
 import colored
 from colored import stylize
-from uuid import UUID, uuid4, getnode
+from uuid import UUID, getnode
 import base64
 import msgpack
 import requests
 import ubirch
 from requests import Response
 from ubirch.ubirch_protocol import UBIRCH_PROTOCOL_TYPE_REG, UBIRCH_PROTOCOL_TYPE_BIN
+
+from config import device_uuid, ub_env, ub_auth, device_type, device_name, device_hwid, validator_address
+from demo_logging import logger
 from ubirch_proto import Proto
-from halo import Halo
-
-ok = stylize("✔️ ", colored.fg("green"))
-nok = stylize("❌ ", colored.fg("red"))
-step = stylize("▶ ", colored.fg("blue"))
-
-# region setting up logging
-logging.basicConfig(format='%(asctime)s %(name)20.20s %(levelname)-8.8s %(message)s',
-                    level=logging.WARNING)
-logger = logging.getLogger("demo")
-logger.setLevel(logging.INFO)
-
-logging.getLogger("ubirch_client").setLevel(logging.INFO)
-# endregion
-
-# region config
-config = configparser.ConfigParser()
-config.read("demo.ini")
-
-ub_auth = config["ubirch"]["auth"]
-ub_env = config["ubirch"]["env"]
-validator_address = config["validator"]["address"]
-
-
-def get_from_config_or_default(section, value, make_default, getboolean=False):
-    if getboolean:
-        res = config.getboolean(section, value, fallback=None)
-    else:
-        res = config.get(section, value, fallback=None)
-    if res is None:
-        res = make_default()
-        if config[section] is None:
-            config[section] = {}
-        config[section][value] = str(res)
-    return res
-
-
-device_uuid = UUID(get_from_config_or_default("device", "uuid", lambda: str(uuid4())))
-device_name = get_from_config_or_default("device", "name", lambda: "Demo Device")
-device_type = get_from_config_or_default("device", "type", lambda: "demo-device")
-device_hwid = UUID(get_from_config_or_default("device", "hwId", lambda: str(device_uuid)))
-
-add_stdout = get_from_config_or_default("demo", "stdout", lambda: False, getboolean=True)
-
-with open("demo.ini", "w") as f:
-    config.write(f)
-
-if add_stdout:
-    logger.addHandler(logging.StreamHandler(sys.stdout))
-
-
-def abort():
-    logger.error(stylize("Aborting!", colored.fg("red")))
-    exit(1)
-
-
-def wait(t, reason="Waiting..."):
-    if add_stdout:
-        with Halo(reason, spinner="dots"):
-            time.sleep(t)
-        logger.info(ok + reason + " done!")
-    else:
-        logger.info(reason)
-        time.sleep(t)
-# endregion
+from util import ok, nok, step, abort, wait, shorten
 
 
 # region setting up the keystore, api and the protocol
@@ -90,7 +26,6 @@ keystore = ubirch.KeyStore(device_uuid.hex + ".jks", "demo-keystore")
 api = ubirch.API(ub_auth, ub_env, logger.level == logging.DEBUG)
 
 protocol = Proto(keystore, device_uuid)
-atexit.register(protocol.persist, device_uuid)
 # endregion
 
 # region check the connection to ubirch api
@@ -153,8 +88,6 @@ if not api.device_exists(device_uuid):
     time.sleep(5)
 else:
     logger.info(ok + "Device {} already exists".format(stylize(device_name, colored.fg("blue"))))
-
-
 # endregion
 
 
@@ -194,7 +127,9 @@ logger.info(step + "Validating the message with on-premise validator")
 response = requests.get(validator_address + "/" + quote(h_str, safe="+="))
 if response.ok:
     logger.info(ok + "Message {} successfully verified".format(stylize(h_str, colored.fg("green"))))
-    logger.info(stylize(pformat(response.json()), colored.fg("green")))
+    json = response.json()
+    shortened = {key: shorten(json[key]) for key in json}
+    logger.info(stylize(pformat(shortened), colored.fg("green")))
 else:
     logger.error(nok + "Failed to verify the message {} ({} - {})"
                  .format(stylize(h_str, colored.fg("blue")),

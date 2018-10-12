@@ -1,3 +1,4 @@
+import atexit
 import logging
 import pickle
 from uuid import UUID
@@ -13,6 +14,7 @@ class Proto(ubirch.Protocol):
         self.__ks = key_store
         self.load(uuid)
         logger.info("ubirch-protocol: device id: {}".format(uuid))
+        atexit.register(self.persist, uuid)
 
     def persist(self, uuid: UUID):
         signatures = self.get_saved_signatures()
@@ -25,7 +27,7 @@ class Proto(ubirch.Protocol):
                 signatures = pickle.load(f)
                 logger.info("loaded {} known signatures".format(len(signatures)))
                 self.set_saved_signatures(signatures)
-        except Exception as _e:
+        except:
             logger.warning("no existing saved signatures")
             pass
 
