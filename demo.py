@@ -162,10 +162,9 @@ else:
 logger.info(step + "Sending the message")
 
 
-def send_message(uuid: UUID, payload: bytes) -> (Response, bytes):
+def send_message(uuid: UUID, payload: bytes) -> Response:
     message = protocol.message_chained(uuid, UBIRCH_PROTOCOL_TYPE_BIN, payload)
-    sig = protocol._signatures[uuid]
-    return api.send(message), sig
+    return api.send(message)
 
 
 now = datetime.now(timezone.utc)
@@ -176,7 +175,7 @@ msg = struct.pack("LLf", getnode(), posix_timestamp_millis, 900)
 h = hashlib.sha512(msg).digest()
 h_str = bytes.decode(base64.b64encode(h))
 
-response, signature = send_message(device_uuid, h)
+response = send_message(device_uuid, h)
 if response.ok:
     logger.info(ok + "Successfully sent {}".format(stylize(h_str, colored.fg("green"))))
     resp = msgpack.loads(response.content)
