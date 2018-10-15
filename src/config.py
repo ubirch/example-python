@@ -7,7 +7,7 @@ from demo_logging import logger
 
 config_filename = "demo.ini" if len(sys.argv) < 2 else sys.argv[1]
 
-config = configparser.ConfigParser()
+config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
 config.read(config_filename)
 
 ub_auth = config["ubirch"]["auth"]
@@ -34,6 +34,7 @@ device_type = get_from_config_or_default("device", "type", lambda: "demo-device"
 device_hwid = UUID(get_from_config_or_default("device", "hwId", lambda: str(device_uuid)))
 
 add_stdout = get_from_config_or_default("demo", "stdout", lambda: False, getboolean=True)
+show_username = get_from_config_or_default("demo", "show-username", lambda: True, getboolean=True)
 
 with open(config_filename, "w") as f:
     config.write(f)

@@ -1,7 +1,6 @@
 import hashlib
 from datetime import datetime, timezone, timedelta
 import logging
-import time
 from urllib.parse import quote
 import colored
 from colored import stylize
@@ -13,13 +12,14 @@ import ubirch
 from requests import Response
 from ubirch.ubirch_protocol import UBIRCH_PROTOCOL_TYPE_REG, UBIRCH_PROTOCOL_TYPE_BIN
 
-from config import device_uuid, ub_env, ub_auth, device_type, device_name, device_hwid, validator_address
+from config import device_uuid, ub_env, ub_auth, device_type, device_name, device_hwid, validator_address, \
+    show_username
 from demo_logging import logger
 from ubirch_proto import Proto
 from util import ok, nok, step, abort, wait, shorten, make_sensitive_message
 
 # region setting up the keystore, api and the protocol
-keystore = ubirch.KeyStore(device_uuid.hex + ".jks", "demo-keystore")
+keystore = ubirch.KeyStore(device_uuid.hex + ".jks", "demo-keystore")  # use a better password in production
 api = ubirch.API(ub_auth, ub_env, logger.level == logging.DEBUG)
 
 protocol = Proto(keystore, device_uuid)
@@ -31,7 +31,10 @@ logger.info(step + "Checking authorization")
 user_req = requests.get("https://auth.{}.ubirch.com/api/authService/v1/userInfo".format(ub_env), headers=api._auth)
 if user_req.ok:
     username = user_req.json()["displayName"]
-    logger.info(ok + "Authorized as {}".format(stylize(username, colored.fg("green"))))
+    if show_username:
+        logger.info(ok + "Authorized as {}".format(stylize(username, colored.fg("green"))))
+    else:
+        logger.info(ok + "Authorized")
 else:
     logger.error(nok + "Not authorized!")
     abort()
@@ -84,7 +87,7 @@ if not api.device_exists(device_uuid):
                              stylize(d_create_resp.content, colored.fg("red"))))
         abort()
     # give the system some time
-    time.sleep(5)
+    wait(5, "Waiting for the device to be created")
 else:
     logger.info(ok + "Device {} already exists".format(stylize(device_name, colored.fg("blue"))))
 # endregion
@@ -98,7 +101,7 @@ def check_response(response, type):
         logger.info(ok + "{} - message successfully sent".format(type))
     else:
         logger.error(nok + "{} - failed to send the message ({} - {})"
-                     .format(type, response.status_code, response.content))
+                     .format(type, stylize(response.status_code, colored.fg('yellow')), stylize(response.content, colored.fg('red'))))
 
 
 now = datetime.now(timezone.utc)
@@ -139,7 +142,7 @@ else:
     logger.error(nok + "Some messages failed")
 # endregion
 
-# region sealing the payload
+# region sealing the message
 logger.info(step + "Sealing a sensitive message")
 
 
@@ -174,16 +177,19 @@ secret_backend["secret_message"] = msg
 
 logger.info(stylize("... meanwhile in the super-secret backend ...", colored.fg("orange_1")))
 
-# region verify the message
+# region verifying the message
 srvr = stylize("sec-srvr> ", colored.fg("yellow"))
 
 received_message = secret_backend["secret_message"]
 received_message_b64 = bytes.decode(base64.b64encode(received_message))
 logger.info(srvr + "Received a super-secret message {}".format(stylize(received_message_b64, colored.fg("blue"))))
 
-logger.info(srvr + step + "Validating the message with on-premise validator")
+if 'localhost' in validator_address:
+    logger.info(srvr + step + "Validating the message with on-premise validator")
+else:
+    logger.info(srvr + step + "Validating the message with remote validator")
 received_message_hash = bytes.decode(base64.b64encode(hashlib.sha512(received_message).digest()))
-response = requests.get(validator_address + "/" + quote(received_message_hash, safe="+="))
+response = requests.get(validator_address + "/" + quote(received_message_hash, safe="+="), headers=api._auth)
 
 if response.ok:
     logger.info(srvr + ok + "Message {} successfully verified"
