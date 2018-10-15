@@ -80,4 +80,5 @@ Be sure to put your authentication token in the config file (`demo.ini` by defau
 The first argument to most of the scripts is the (optional) path to the config file.
 
 ## See also
-[Other examples on ubirch.github.io](ubirch.github.io/examples.html)
+[ubirch-protocol-python](https://github.com/ubirch/ubirch-protocol-python)
+[Other examples on ubirch.github.io](https://ubirch.github.io/examples.html)

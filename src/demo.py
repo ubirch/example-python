@@ -70,7 +70,7 @@ if not api.device_exists(device_uuid):
         # you can put group uuids here, so other users see the device
         "groups": ["db1488ae-becc-40a3-a5c2-b6daadd6715b"],
         "hwDeviceId": str(device_hwid),
-        "tags": ["milestone-demo", "python-client"],
+        "tags": ["python-example", "python-client"],
         "deviceProperties": {
             "storesData": True,
             "blockChain": False
@@ -115,8 +115,8 @@ check_response(resp0, "\t0x32 (single)")
 
 # ... or an array of such measurements
 message1 = protocol.message_chained(device_uuid, 0x32, [
-    [posix_timestamp_micros, 42, 1337],
-    [posix_timestamp_micros + 1e6, 7, 666]
+    [int(posix_timestamp_micros), 42, 1337],
+    [int(posix_timestamp_micros + 1e6), 7, 666]
 ])
 resp1 = api.send(message1)
 check_response(resp1, "\t0x32 (multi) ")
