@@ -1,8 +1,7 @@
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import logging
 import time
-from pprint import pformat
 from urllib.parse import quote
 import colored
 from colored import stylize
@@ -65,6 +64,8 @@ if not api.device_exists(device_uuid):
         "deviceId": str(device_uuid),
         "deviceTypeKey": device_type,
         "deviceName": device_name,
+        # you can put group uuids here, so other users see the device
+        "groups": ["db1488ae-becc-40a3-a5c2-b6daadd6715b"],
         "hwDeviceId": str(device_hwid),
         "tags": ["milestone-demo", "python-client"],
         "deviceProperties": {
@@ -86,6 +87,56 @@ if not api.device_exists(device_uuid):
     time.sleep(5)
 else:
     logger.info(ok + "Device {} already exists".format(stylize(device_name, colored.fg("blue"))))
+# endregion
+
+# region sending an ordinary message
+logger.info(step + "Sending some ordinary messages to ubirch")
+
+
+def check_response(response, type):
+    if response.ok:
+        logger.info(ok + "{} - message successfully sent".format(type))
+    else:
+        logger.error(nok + "{} - failed to send the message ({} - {})"
+                     .format(type, response.status_code, response.content))
+
+
+now = datetime.now(timezone.utc)
+epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)  # use POSIX epoch
+posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
+
+# 0x32 - a measurement starting with a timestamp...
+message0 = protocol.message_chained(device_uuid, 0x32, [posix_timestamp_micros, 42, 1337])
+resp0 = api.send(message0)
+check_response(resp0, "\t0x32 (single)")
+
+# ... or an array of such measurements
+message1 = protocol.message_chained(device_uuid, 0x32, [
+    [posix_timestamp_micros, 42, 1337],
+    [posix_timestamp_micros + 1e6, 7, 666]
+])
+resp1 = api.send(message1)
+check_response(resp1, "\t0x32 (multi) ")
+
+# 0x53 - generic sensor message - just send a json
+message2 = protocol.message_chained(device_uuid, 0x53, {"message": "Hello World!", "foo": 42})
+resp2 = api.send(message2)
+check_response(resp2, "\t0x53 (json)  ")
+
+# 0x00 - binary message
+message3 = protocol.message_chained(device_uuid, 0x00, b"just some bytes")
+resp3 = api.send(message3)
+check_response(resp3, "\t0x00 (binary)")
+
+# a message that's not chained to the previous messages
+message4 = protocol.message_signed(device_uuid, 0x00, b"some other bytes")
+resp4 = api.send(message4)
+check_response(resp4, "\tnon-chained message")
+
+if all(map(lambda r: r.ok, [resp0, resp1, resp2, resp3, resp4])):
+    logger.info(ok + "Successfully sent all the messages")
+else:
+    logger.error(nok + "Some messages failed")
 # endregion
 
 # region sealing the payload
