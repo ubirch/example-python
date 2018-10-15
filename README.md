@@ -35,7 +35,7 @@ The demo follows these steps (step names link to the relevant code):
 4) [**Device creation**](https://github.com/ubirch/example-python/blob/master/src/demo.py#L64-L92)
 
     Here we check if the device already exists, and create it if it doesn't. You can always check the exact meaning of
-    the passed device object at the [API documentation](http://developer.ubirch.com/docs/api/). In our case it's the
+    the passed arguments in the [API documentation](http://developer.ubirch.com/docs/api/). In our case it's the
     `POST /device` endpoint of the Avatar service.
     
 5) [**Sending messages**](https://github.com/ubirch/example-python/blob/master/src/demo.py#L96-L142)
