@@ -79,6 +79,11 @@ Be sure to put your authentication token in the config file (`demo.ini` by defau
 
 The first argument to most of the scripts is the (optional) path to the config file.
 
+## Script output
+By default all the output is logged to stderr. If you want to also log to stdout, set `demo:stdout` to `true` in the 
+config file. If you don't want to see stderr output, use shell to redirect it (i.e. `python src/demo.py 2>/dev/null`).
+The `run-demo.sh` script does it automatically if it detects that stdout option is enabled.
+
 ## See also
 [ubirch-protocol-python](https://github.com/ubirch/ubirch-protocol-python)
 [Other examples on ubirch.github.io](https://ubirch.github.io/examples.html)

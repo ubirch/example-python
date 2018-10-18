@@ -1,7 +1,10 @@
 import configparser
 import logging
 import sys
+import traceback
 from uuid import UUID, uuid4
+
+import colored
 
 from demo_logging import logger
 
@@ -36,8 +39,15 @@ device_hwid = UUID(get_from_config_or_default("device", "hwId", lambda: str(devi
 add_stdout = get_from_config_or_default("demo", "stdout", lambda: False, getboolean=True)
 show_username = get_from_config_or_default("demo", "show-username", lambda: True, getboolean=True)
 
+
+def log_unhandled_stdout(exctype, value, tb):
+    logger.error(colored.stylize("❌ ", colored.fg("red")) + "Unhandled exception")
+    traceback.print_exception(exctype, value, tb, file=sys.stdout)
+
+
 with open(config_filename, "w") as f:
     config.write(f)
 
 if add_stdout:
     logger.addHandler(logging.StreamHandler(sys.stdout))
+    sys.excepthook = log_unhandled_stdout

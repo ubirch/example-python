@@ -9,5 +9,9 @@ if [ -z "$VIRTUAL_ENV" ]; then
     pip -q --no-cache-dir install -r requirements.txt
 fi
 
-# redirects stderr, so make sure you have demo:stdout = true in the demo.ini file
-python src/demo.py $1 2>/dev/null
+# don't silence the stderr if stdout is not enabled
+if cat ${1:-demo.ini} | grep "stdout\\s*=\\s*true" > /dev/null; then
+    python src/demo.py $1 2>/dev/null
+else
+    python src/demo.py $1
+fi
