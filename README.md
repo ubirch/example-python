@@ -1,4 +1,5 @@
 # Python examples for ubirch API
+**This example code is currently outdated and will be fixed soon. In the mean time, please use [ubirch-protocol-python example](https://github.com/ubirch/ubirch-protocol-python/tree/master/examples) instead.**
 
 This project is a demonstration of ubirch client for Python. The entry point is the [`demo.py` file](src/demo.py).
 
